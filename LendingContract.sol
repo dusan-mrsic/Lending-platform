@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.7.0;
 
 import "./LendLordToken.sol";
 
@@ -24,7 +24,6 @@ contract LendingContract is Ownable {
     uint256 internal totalFeeEth;
     uint256 internal totalIds;
     uint256 public timestampLowerBound;
-    uint256 internal timestampUpperBound;
     ILendLordToken public token;
 
     enum State {INITIAL, BORROWED, RETURNED, OVERDRAFTED}
@@ -70,7 +69,6 @@ contract LendingContract is Ownable {
         maxFee = _maxFee;
         totalIds = 0;
         timestampLowerBound = 0;
-        timestampUpperBound = 0;
         token = _token;
     }
 
@@ -117,23 +115,23 @@ contract LendingContract is Ownable {
         totalFeeEth = 0;
     }
 
-    function withdrawOverdraftContractEth() external onlyOwner {
-        timestampUpperBound = block.timestamp;
-        (uint256 overdraftEth, uint256 lowerBound) = calculateOverdraft();
-        totalOverdraftEth += overdraftEth;
-        timestampLowerBound = lowerBound;
-        token.burn(owner(), totalOverdraftEth * 100);
-        payable(owner()).transfer(totalOverdraftEth);
-        totalOverdraftEth = 0;
+    function withdrawOverdraftContractEth(uint256 _amount) external onlyOwner {
+        token.burn(owner(), _amount * 100);
+        payable(owner()).transfer(_amount);
     }
 
-    function calculateOverdraft() internal view onlyOwner returns (uint256, uint256) {
+    function setTimestampLowerBound(uint256 _timestampLowerBound) external onlyOwner {
+        timestampLowerBound = _timestampLowerBound;
+    }
+
+    function calculateOverdraft() external view returns (uint256, uint256) {
+        require(msg.sender == owner(), "This is not owner");
         uint256 maxLowerTimestamp = timestampLowerBound;
         uint256 overdraftTokens = 0;
         for(uint i = 0; i < totalIds; i++) {
             address customerAddr = customersIds[i];
             Customer memory customer = customers[customerAddr];
-            if(customer.longestAvailableReturn > timestampLowerBound && customer.longestAvailableReturn < timestampUpperBound && customer.state == State.BORROWED) {
+            if(customer.longestAvailableReturn > timestampLowerBound && customer.longestAvailableReturn <= block.timestamp && customer.state == State.BORROWED) {
                 if(customer.longestAvailableReturn > maxLowerTimestamp) maxLowerTimestamp = customer.longestAvailableReturn;
                 overdraftTokens += customer.eth;
                 customer.eth = 0;
