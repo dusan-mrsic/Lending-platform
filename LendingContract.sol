@@ -16,8 +16,8 @@ interface ILendLordToken {
 
 contract LendingContract is Ownable {
 
-    uint256 public minDuration; // in days
-    uint256 public maxDuration; // in days
+    uint256 public minDuration; // in minutes
+    uint256 public maxDuration; // in minutes
     uint256 public minFee; // in percent
     uint256 public maxFee; // in percent
     uint256 public totalOverdraftEth;
@@ -76,8 +76,8 @@ contract LendingContract is Ownable {
 
     function borrowTokens(uint256 _durationDays) external payable {
         uint256 borrowAmount = msg.value * 100;
-        uint256 claimAvailableTimestamp = block.timestamp + _durationDays * 1 days; // time when customer can claim eth after returning LL tokens
-        uint256 longestAvailableReturn = block.timestamp + (_durationDays + _durationDays / 2) * 1 days; // time with overdraft
+        uint256 claimAvailableTimestamp = block.timestamp + _durationDays * 1 minutes; // time when customer can claim eth after returning LL tokens
+        uint256 longestAvailableReturn = block.timestamp + (_durationDays + _durationDays / 2) * 1 minutes; // time with overdraft
         uint256 fee = minFee + (maxFee - minFee) / (maxDuration - minDuration) * (maxDuration - _durationDays);
         token.mint(msg.sender, borrowAmount);
         customers[msg.sender] = Customer(borrowAmount, fee, _durationDays, claimAvailableTimestamp, msg.value, longestAvailableReturn, State.BORROWED);
@@ -91,7 +91,7 @@ contract LendingContract is Ownable {
         if(block.timestamp < customer.claimAvailableTimestamp) {
             feeInEth = customer.eth * customer.fee / 100;
         }else if(block.timestamp < customer.longestAvailableReturn) {
-            uint256 overdraftFee = customer.fee + maxFee * ((block.timestamp - customer.claimAvailableTimestamp) / 1 days);
+            uint256 overdraftFee = customer.fee + maxFee * ((block.timestamp - customer.claimAvailableTimestamp) / 1 minutes);
             feeInEth = customer.eth * overdraftFee / 100;
         }else {
             totalOverdraftEth += customer.eth;
@@ -102,7 +102,6 @@ contract LendingContract is Ownable {
         totalFeeEth += feeInEth;
         customer.state = State.RETURNED;
         token.burn(msg.sender, customer.borrowAmount);
-
     }
 
     function withdrawEth() external onlyReturened availableClaim {
